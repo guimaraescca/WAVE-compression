@@ -1,0 +1,8 @@
+O header para o arquivo comprimido foi definido a partir da seguinte lógica:
+    O header possui 4 bytes, para guardar um número decimal de 3 unidades. Cada unidade corresponde a um algoritmo de compressão da seguinte forma:
+        header = <d,c,h>;
+    Onde:
+        d - Codificação por diferenças
+        c - Codificação por carreira (Run-length)
+        h - Codificação Huffman
+    Os valores dos digitos 'd', 'c' e 'h' variam entre '0' e '1' onde '0' implica que o algoritmo não foi utilizado e '1' implica sua utilização.
