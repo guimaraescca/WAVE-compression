@@ -1,12 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
+#include <malloc.h>
 
 /* Struct that defines the header data of a WAVE file */
 typedef struct waveHeader {
     char chunkID[4];
     int chunckSize;
-    char format[4];s
+    char format[4];
 
     char subChunk1ID[4];
     int subChunk1Size;
@@ -15,10 +17,10 @@ typedef struct waveHeader {
     int sampleRate;
     int byteRate;
     short int blockAlign;
-    short int bitsPerSample;
+    short int bitsPerSample;    // Offset 34
 
     char subChunck2ID[4];
-    int subChunk2Size;
+    int subChunk2Size;          // Number of samples
 } waveHeader;
 
 typedef enum {
@@ -53,10 +55,10 @@ int getCompHeader( char* filename ) {
 int fileWrite( char* filename , char* options) {
 
     FILE *write = fopen( filename, options );
-    int number = 8;
-    char header[4];
+    uint32_t number = 0b00001000;
+    char header[1];
 
-    snprintf( header, 4, "%d", number );
+    snprintf( header, 1, "%d", number );
 
     printf( "Writing number: %i as a string: %s\n", number, header );
 
@@ -67,8 +69,25 @@ int fileWrite( char* filename , char* options) {
 }
 
 /* Encode processing */
-int encode( char* inputFilename, char* outputFilename) {
+int encode( char* inputFilename, char* outputFilename, uint32_t options ) {
 
+    FILE* inputFile = fopen( inputFilename, "rb" );
+    waveHeader* header = ( waveHeader* )malloc( sizeof( waveHeader ) );
+
+    if( inputFile == NULL ) {
+        printf( "[Error] \tUnable to read input file. <encode>\n" );
+        return 0;
+    }
+
+    fread( header, 1, sizeof( waveHeader ), inputFile );
+
+    printf( "[Encode]\tBits per sample: %i\n", header->bitsPerSample );
+    printf( "[Encode]\tNumber of samples: %i\n", header->subChunk2Size );
+/*
+    while( !feof( inputFile ) ){
+        // Reading
+    }
+*/
 }
 
 /* Decode processing */
@@ -78,13 +97,18 @@ int decode( char* inputFilename, char* outputFilename ) {
     getCompHeader( inputFilename );
 }
 
+// TODO: what does it mean?
+// char* pCh = ( optionsInput, "a" );
+
 int main( int argc, char* argv[] ) {
 
     int i;
+    uint32_t options = 0b00000000;
+    char operationInput[50];
+    char optionsInput[50];
     char inputFilename[50];
     char outputFilename[50];
-    char operationInput[10];
-    char inputString[200];
+    char* pCh;
 
     //fileWrite( argv[2], "w+" );
 
@@ -93,8 +117,11 @@ int main( int argc, char* argv[] ) {
         printf( "[Error] \tInsuficient number of inputs(%i).\n", argc );
         return 0;
     }
+    strcpy(operationInput, argv[1]);
+    strcpy(inputFilename, argv[argc-2]);
+    strcpy(outputFilename, argv[argc-1]);
 
-    printf( "Operation: %s %s %s\n", argv[1], argv[2], argv[3] );
+    printf( "Operation: %s %s %s\n", operationInput, inputFilename, outputFilename );
 
     /* Processing a code operation */
     if ( operationInput,"encode" ){
@@ -105,20 +132,36 @@ int main( int argc, char* argv[] ) {
         }
 
         /* Concatenate all inputs in argv, to identify the options */
-        for( i = 0; i < argc; i++ ){
-            strcat( inputString, argv[i] );
+        for( i = 2; i <= (argc-3); i++ ){   // If we have more than 4 argc inputs it's ok to do it
+            strcat( optionsInput, argv[i] );
         }
 
-        //encode(inputFilename, outputFilename, argc);
+        // Check for differences encoding
+        pCh = strstr( optionsInput, "-d" );
+        if ( pCh != NULL ){
+            options = (options | 0b00000100);
+            printf( "Requested -d (%i) \n", options );
+        }
+        // Check for run-length encoding
+        pCh = strstr( optionsInput, "-c" );
+        if ( pCh != NULL ){
+            options = (options | 0b00000010);
+            printf( "Requested -c (%i) \n", options );
+        }
+        // Check for Huffman coding
+        pCh = strstr( optionsInput, "-h" );
+        if ( pCh != NULL ){
+            options = (options | 0b00000001);
+            printf( "Requested -h (%i) \n", options );
+        }
+
+        encode( inputFilename, outputFilename, options );
     }
 
     /* Processing a decoding operation */
     if( operationInput, "decode" ){
 
-        strcpy( inputFilename, argv[2] );
-        strcpy( outputFilename, argv[3] );
-
-        //decode(inputFilename, outputFilename);
+        //decode( inputFilename, outputFilename );
     }
 
     return 0;

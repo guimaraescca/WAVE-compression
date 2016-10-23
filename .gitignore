@@ -1,0 +1,15 @@
+# Object files
+*.o
+*.obj
+
+# Executables
+*.out
+main
+
+
+# Files being edited
+*~
+
+# Output files
+*.bin
+
