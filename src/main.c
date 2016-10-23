@@ -52,7 +52,7 @@ int getCompHeader( char* filename ) {
     return header;
 }
 
-int fileWrite( char* filename , char* options) {
+int fileWrite( char* filename , char* options ) {
 
     FILE *write = fopen( filename, options );
     uint32_t number = 0b00001000;
@@ -68,11 +68,40 @@ int fileWrite( char* filename , char* options) {
     return 0;
 }
 
+/*  sampleArray - Char array containing representing 1 sample
+    size - Number of bits per sample
+    intSample - Value where the sample will be computed into an int
+    */
+int recursiveCharToIntSample( char* sampleArray, int size, int intSample ){
+
+    intSample = sampleArray[0];
+
+    if( size != 8 ){
+        intSample = intSample << ( size-8 );
+    }
+
+    memmove( sampleArray, sampleArray+1, strlen( sampleArray ) );
+
+    if( size == 8 ){
+        return intSample;
+    }
+
+    recursiveCharToIntSample( sampleArray, size-8, intSample );
+}
+
 /* Encode processing */
 int encode( char* inputFilename, char* outputFilename, uint32_t options ) {
 
     FILE* inputFile = fopen( inputFilename, "rb" );
     waveHeader* header = ( waveHeader* )malloc( sizeof( waveHeader ) );
+    int charRead;
+    int nCharRead = 0;
+    int charPerSample;
+    int charRequired;
+
+    char* sampleArray;
+    int* sampleArrayInt;
+    char charToIntArray[(header->bitsPerSample/8)-1];
 
     if( inputFile == NULL ) {
         printf( "[Error] \tUnable to read input file. <encode>\n" );
@@ -81,13 +110,37 @@ int encode( char* inputFilename, char* outputFilename, uint32_t options ) {
 
     fread( header, 1, sizeof( waveHeader ), inputFile );
 
-    printf( "[Encode]\tBits per sample: %i\n", header->bitsPerSample );
-    printf( "[Encode]\tNumber of samples: %i\n", header->subChunk2Size );
-/*
-    while( !feof( inputFile ) ){
-        // Reading
+    charPerSample = ( header->bitsPerSample/8 );        // Number of chars required to store 1 sample
+    charRequired = charPerSample*header->subChunk2Size; // Number of chars required to store the file
+
+    sampleArray = ( char* )malloc( charRequired*sizeof( char ) );           // Allocate the array used to store the samples
+    sampleArrayInt = ( int* )malloc( header->subChunk2Size*sizeof( int ) ); // Allocate the array used to store the char samples into int
+
+    /* Reading the file data */
+    fseek( inputFile, 44, SEEK_SET );
+    fread( sampleArray, 1, charRequired, inputFile );
+
+    /* Just to verify the byte read */
+    do{
+        //printf(" char %i\n", sampleArray[ nCharRead ] );
+        nCharRead++;
+    } while( nCharRead != charRequired );
+
+    /* Transform every (bitsPerSample/8) chars into 1 int */
+    nCharRead = 0;
+    while ( nCharRead != header->subChunk2Size ){
+
+        memmove(charToIntArray, sampleArray + nCharRead, charPerSample );
+
+        sampleArrayInt[ nCharRead/charPerSample ] = recursiveCharToIntSample(charToIntArray, header->bitsPerSample, 0);
+
+        //printf("int %i\n", sampleArrayInt[nCharRead/4] );
+        nCharRead = nCharRead + charPerSample;
     }
-*/
+
+    nCharRead = 0;
+    printf("Chars read: %i\n", nCharRead );
+
 }
 
 /* Decode processing */
