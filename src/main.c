@@ -24,6 +24,11 @@ typedef struct waveHeader {
     int subChunk2Size;          // Number of samples
 } waveHeader;
 
+typedef struct compressionHeader {
+    int originalSize;
+    int options;
+}compressionHeader;
+
 typedef enum {
     false, true
 } bool;
@@ -91,7 +96,8 @@ int deltaEncode( int* sampleArrayInt, waveHeader* header ){
 }
 
 /* Delta decoding function */
-int deltaDecode( int* sampleArrayInt, waveHeader* header ){
+int deltaDecode( int* sampleArrayInt, int arraySize ){
+
 
 }
 
@@ -125,8 +131,37 @@ int* runLengthEncode( int* sampleArrayInt, int arraySize , int* runLengthSize ){
             }
         }
     }
+
     *runLengthSize = runLengthArraySize;
     return runLengthArray;
+}
+
+/* Run-length decoding function */
+int* runLengthDecode( int* sampleArrayInt, int arraySize , int* runLengthSize ){
+
+    int i, j;
+    int totalCount = 0;
+
+    for(i=0; i<=arraySize; i++){
+        totalCount = totalCount + sampleArrayInt[i];
+    }
+
+    int newArraySize = ceil( (double)totalCount/32.0 ) ;
+    int* newSampleArray = ( int* )calloc(newArraySize, sizeof(int) );
+    int bitCount = 0;
+    int writingBit = 0;
+
+    for( i=0; i< arraySize; i++ ){
+        for( j=0; j<sampleArrayInt[i]; j++ ){
+            // Generating bits from run-length decoding and writing them as a new array
+            newSampleArray[ bitCount/32 ] = newSampleArray[ bitCount/32 ] | ( writingBit << ( 31-( bitCount%32 ) ) );
+            bitCount++;
+        }
+        writingBit = !writingBit;       // Starts counting the next sequence
+    }
+
+    *runLengthSize = newArraySize;
+    return newSampleArray;
 }
 
 int huffmanEncode( int* sampleArrayInt, int arraySize ){
@@ -152,18 +187,16 @@ int recursiveCharToIntSample( char* sampleArray, int size, int intSample ){
     recursiveCharToIntSample( sampleArray+1, size-8, intSample );
 }
 
+/* ************************************************************************* */
 /* Encode processing */
+/* ************************************************************************* */
 int encode( char* inputFilename, char* outputFilename, uint32_t options ) {
 
     FILE* inputFile = fopen( inputFilename, "rb" );
     waveHeader* header = ( waveHeader* )malloc( sizeof( waveHeader ) );
     int charRead;
     int nCharRead = 0;
-    int charPerSample;
-    int charRequired;
 
-    char* sampleArray;
-    int* sampleArrayInt;
     char charToIntArray[(header->bitsPerSample/8)-1];
 
     if( inputFile == NULL ) {
@@ -173,17 +206,36 @@ int encode( char* inputFilename, char* outputFilename, uint32_t options ) {
 
     fread( header, 1, sizeof( waveHeader ), inputFile );
 
-    charPerSample = ( header->bitsPerSample/8 );        // Number of chars required to store 1 sample
-    charRequired = charPerSample*header->subChunk2Size; // Number of chars required to store the file
+    int charPerSample = ( header->bitsPerSample/8 );        // Number of chars required to store 1 sample
+    int charRequired = charPerSample*header->subChunk2Size; // Number of chars required to store the file
 
-    sampleArray = ( char* )malloc( charRequired*sizeof( char ) );           // Allocate the array used to store the samples as char
-    sampleArrayInt = ( int* )malloc( header->subChunk2Size*sizeof( int ) ); // Allocate the array used to store the char samples into int
+    char* sampleArray = ( char* )malloc( charRequired*sizeof( char ) );           // Allocate the array used to store the samples as char
+    int* sampleArrayInt = ( int* )malloc( header->subChunk2Size*sizeof( int ) ); // Allocate the array used to store the char samples into int
 
+    /* ------------------------------------------------------------------------- */
     /* Reading the file data */
+
     fseek( inputFile, 44, SEEK_SET );
     fread( sampleArray, 1, charRequired, inputFile );
 
-    /* Transform every (bitsPerSample/8) chars into 1 int */
+    /* ------------------------------------------------------------------------- */
+    /* Reading data after the audio data */
+
+    int beginLastSubChunk = sizeof( waveHeader ) + header->subChunk2Size;
+    fseek( inputFile, 0, SEEK_END );
+    int endLastSubChunk = ftell( inputFile );
+    int lastSubChunkSize = endLastSubChunk - beginLastSubChunk;
+
+    char* lastSubChunk = 0;
+    if( lastSubChunkSize !=0 ){
+
+        lastSubChunk = ( char* )malloc( lastSubChunkSize*sizeof( char ) );
+        fread( lastSubChunk, 1, lastSubChunkSize, inputFile);
+    }
+
+    /* ------------------------------------------------------------------------- */
+    /* Transform every 'bitsPerSample/8' chars into 1 int */
+
     int number;
     nCharRead = 0;
     while ( nCharRead <= header->subChunk2Size ){
@@ -194,7 +246,9 @@ int encode( char* inputFilename, char* outputFilename, uint32_t options ) {
         nCharRead = nCharRead + charPerSample;
     }
 
+    /* ------------------------------------------------------------------------- */
     /* Execute the encoding algorithms requested */
+
     int arraySize;
     if( (options & 0b00000100) == 0b00000100 ){ //Delta encoding
 
@@ -204,20 +258,91 @@ int encode( char* inputFilename, char* outputFilename, uint32_t options ) {
 
         int runLengthSize;
         int*  aux = runLengthEncode( sampleArrayInt, header->subChunk2Size , &runLengthSize);
-        free(sampleArrayInt);
-        sampleArrayInt = aux;       // Keeps encapsulation by sending the same array to the next encoding
+        free( sampleArrayInt );
+        sampleArrayInt = aux;                   // Keeps encapsulation by sending the same array to the next encoding
         arraySize = runLengthSize;
     }
     if( (options & 0b00000001) == 0b00000001 ){ //Huffman encoding
         huffmanEncode(sampleArrayInt, arraySize);
     }
+
+    /* ------------------------------------------------------------------------- */
+    /* Writing encoded data to the output file */
+
+    compressionHeader* compHeader = ( compressionHeader* )malloc( sizeof( compressionHeader ) );
+    compHeader->originalSize = arraySize;
+    compHeader->options = options;
+
+    FILE* outputFile = fopen( outputFilename, "wb" );
+    fwrite( compHeader, sizeof( compressionHeader ), 1, outputFile );
+    fwrite( header, sizeof( waveHeader ), 1, outputFile );
+    fwrite( sampleArrayInt, arraySize, 1, outputFile);
+    fwrite( lastSubChunk, lastSubChunkSize, 1, outputFile );
+
 }
 
+/* ************************************************************************* */
 /* Decode processing */
+/* ************************************************************************* */
 int decode( char* inputFilename, char* outputFilename ) {
 
-    printf( "Decoding file input '%s' to ouput '%s'\n", inputFilename, outputFilename );
-    getCompHeader( inputFilename );
+    FILE* inputFile = fopen( inputFilename, "rb" );
+    waveHeader* header = ( waveHeader* )malloc( sizeof( waveHeader ) );
+    compressionHeader* compHeader = ( compressionHeader* )malloc( sizeof( compressionHeader ) );
+
+    if( inputFile == NULL ) {
+        printf( "[Error] \tUnable to read input file. <decode>\n" );
+        return 0;
+    }
+
+    fread( compHeader, 1, sizeof( compressionHeader ), inputFile );
+    fread( header, 1, sizeof( waveHeader ), inputFile );
+
+    /* ------------------------------------------------------------------------- */
+    /* Reading the file data */
+
+    int charPerSample = ( header->bitsPerSample/8 );        // Number of chars required to store 1 sample
+    int charRequired = charPerSample*header->subChunk2Size; // Number of chars required to store the file
+
+    char* sampleArray = ( char* )malloc( charRequired*sizeof( char ) );           // Allocate the array used to store the samples as char
+    int* sampleArrayInt = ( int* )malloc( compHeader->originalSize ); // Allocate the array used to store the char samples into int
+
+    fseek( inputFile, ( sizeof( compressionHeader ) + sizeof( waveHeader ) ), SEEK_SET );
+    fread( sampleArray, 1, compHeader->originalSize, inputFile );
+
+    /* ------------------------------------------------------------------------- */
+    /* Reading data after the audio data */
+
+    int beginLastSubChunk = sizeof( waveHeader ) + sizeof( compHeader ) + compHeader->originalSize;
+    fseek( inputFile, 0, SEEK_END );
+    int endLastSubChunk = ftell( inputFile );
+    int lastSubChunkSize = endLastSubChunk - beginLastSubChunk;
+
+    if( lastSubChunkSize !=0 ){
+
+        char* lastSubChunk = ( char* )malloc( lastSubChunkSize*sizeof( char ) );
+        fread( lastSubChunk, 1, lastSubChunkSize, inputFile);
+    }
+
+    /* ------------------------------------------------------------------------- */
+    /* Execute the decoding algorithms in the compression header */
+
+    int arraySize = compHeader->originalSize;
+    if( ( compHeader->options & 0b00000100) == 0b00000100 ){ //Delta decoding
+
+        deltaDecode( sampleArrayInt, arraySize );
+    }
+    if( ( compHeader->options & 0b00000010) == 0b00000010 ){ //Run-length decoding
+
+        int runLengthSize;
+        int* aux = runLengthDecode( sampleArrayInt, arraySize , &runLengthSize );
+        free( sampleArrayInt );
+        sampleArrayInt = aux;
+        arraySize = runLengthSize;
+    }
+    if( ( compHeader->options & 0b00000001) == 0b00000001 ){ //Huffman decoding
+
+    }
 }
 
 int main( int argc, char* argv[] ) {
@@ -230,20 +355,23 @@ int main( int argc, char* argv[] ) {
     char outputFilename[50];
     char* pCh;
 
-    //fileWrite( argv[2], "w+" );
-
+    /* ------------------------------------------------------------------------- */
     /* Processing input */
+
     if( argc < 3 ){
         printf( "[Error] \tInsuficient number of inputs(%i).\n", argc );
         return 0;
     }
+
     strcpy(operationInput, argv[1]);
     strcpy(inputFilename, argv[argc-2]);
     strcpy(outputFilename, argv[argc-1]);
 
     printf( "Operation: %s %s %s\n", operationInput, inputFilename, outputFilename );
 
-    /* Processing a code operation */
+    /* ------------------------------------------------------------------------- */
+    /* Processing a coding operation */
+
     if ( strcmp(operationInput,"encode") == 0 ){
 
         if ( argc <= 4 ){
@@ -251,7 +379,9 @@ int main( int argc, char* argv[] ) {
             return 0;
         }
 
+        /* ------------------------------------------------------------------------- */
         /* Concatenate all inputs in argv, to identify the options */
+
         for( i = 2; i <= (argc-3); i++ ){   // If we have more than 4 argc inputs it's ok to do it
             strcat( optionsInput, argv[i] );
         }
@@ -278,7 +408,9 @@ int main( int argc, char* argv[] ) {
         encode( inputFilename, outputFilename, options );
     }
 
+    /* ------------------------------------------------------------------------- */
     /* Processing a decoding operation */
+
     if( strcmp( operationInput, "decode" ) == 0 ){
         decode( inputFilename, outputFilename );
     }
