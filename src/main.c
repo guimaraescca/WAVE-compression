@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <malloc.h>
 #include <math.h>
+#include <errno.h>
+#include <sys/stat.h>
 
 /* Struct that defines the header data of a WAVE file */
 typedef struct waveHeader {
@@ -18,87 +20,59 @@ typedef struct waveHeader {
     int sampleRate;
     int byteRate;
     short int blockAlign;
-    short int bitsPerSample;    // Offset 34
+    short int bitsPerSample;
 
     char subChunck2ID[4];
-    int subChunk2Size;          // Number of samples
+    int subChunk2Size;
 } waveHeader;
 
+/* Struct that defines the header containing info about the compression methods used */
 typedef struct compressionHeader {
-    int originalSize;
-    int options;
+    int originalSize;       // Size of the audio data inside de compressed file
+    int options;            // Compressions methods used, stored as bits
 }compressionHeader;
 
-typedef enum {
-    false, true
-} bool;
+/* Get file size */
+off_t getFileSize(char *filename) {
 
-/* Returns the compression header
-       The compression header will be included on the generated output file, it indicates the compression methods used.
-       The header is a 4 byte component that precedes the compressed data.
-*/
-int getCompHeader( char* filename ) {
+    struct stat st;
 
-    FILE *inputFile = fopen(filename, "r");
-    char buffer[10];
-    char* ptr;
-    int header;
-
-    if( inputFile == NULL ) {
-        printf( "[Error] \tUnable to read input file. <getCompHeader>\n" );
-        return 0;
+    if ( stat( filename, &st ) == 0 ){
+        return st.st_size;
     }
-
-    fread( buffer, 1, 1, inputFile );   // Read file header
-    header = strtol(buffer, &ptr, 10);  // Transform file header to an int
-
-    printf( "Compression header - as <char>: %s as <int>: %i\n", buffer, header );
-
-    fclose( inputFile );
-    return header;
-}
-
-int fileWrite( char* filename , char* options ) {
-
-    FILE *write = fopen( filename, options );
-    uint32_t number = 0b00001000;
-    char header[1];
-
-    snprintf( header, 1, "%d", number );
-
-    printf( "Writing number: %i as a string: %s\n", number, header );
-
-    fwrite( header, sizeof(char), sizeof(header), write );
-
-    fclose( write );
-    return 0;
+    return -1;
 }
 
 /* Delta encoding function */
-int deltaEncode( int* sampleArrayInt, waveHeader* header ){
+int* deltaEncode( int* sampleArrayInt, waveHeader* header ){
 
     int* deltaArray = ( int* )malloc( header->subChunk2Size*sizeof( int ) ); // Differrences array
     int i;
-    int minimumDelta = 0;   // Used to give a better compression rate
 
     deltaArray[0] = sampleArrayInt[0];
 
     for( i=1; i<header->subChunk2Size; i++ ){
 
         deltaArray[i] = sampleArrayInt[i] - sampleArrayInt[i-1];
-
-        if ( deltaArray[i] < minimumDelta){
-
-            minimumDelta = deltaArray[i];
-        }
     }
-    return 1;
+
+    return deltaArray;
 }
 
 /* Delta decoding function */
-int deltaDecode( int* sampleArrayInt, int arraySize ){
+int* deltaDecode( int* sampleArrayInt, int arraySize ){
 
+    int* deltaArray = ( int* )calloc( arraySize, sizeof( int ) );
+    int i;
 
+    deltaArray[0] = sampleArrayInt[0];
+
+    for( i=1; i<arraySize; i++ ){
+
+        deltaArray[i] = sampleArrayInt[i-1] - sampleArrayInt[i];
+    }
+
+    return deltaArray;
 }
 
 /* Run-length encoding function */
@@ -116,11 +90,9 @@ int* runLengthEncode( int* sampleArrayInt, int arraySize , int* runLengthSize ){
         for(j=31; j>=0; j--){
 
             bit = ( sampleArrayInt[i] >> j ) & 1;
-
             if( bit == actualCount ){
 
                 count++;
-
             }else{
 
                 runLengthArraySize++;
@@ -142,10 +114,10 @@ int* runLengthDecode( int* sampleArrayInt, int arraySize , int* runLengthSize ){
     int i, j;
     int totalCount = 0;
 
+    printf("GOKU arraysize %i \n", arraySize );
     for(i=0; i<=arraySize; i++){
         totalCount = totalCount + sampleArrayInt[i];
     }
-
     int newArraySize = ceil( (double)totalCount/32.0 ) ;
     int* newSampleArray = ( int* )calloc(newArraySize, sizeof(int) );
     int bitCount = 0;
@@ -197,8 +169,6 @@ int encode( char* inputFilename, char* outputFilename, uint32_t options ) {
     int charRead;
     int nCharRead = 0;
 
-    char charToIntArray[(header->bitsPerSample/8)-1];
-
     if( inputFile == NULL ) {
         printf( "[Error] \tUnable to read input file. <encode>\n" );
         return 0;
@@ -221,11 +191,14 @@ int encode( char* inputFilename, char* outputFilename, uint32_t options ) {
     /* ------------------------------------------------------------------------- */
     /* Reading data after the audio data */
 
+    // Obtaining the size os the chunck afters the audio data
     int beginLastSubChunk = sizeof( waveHeader ) + header->subChunk2Size;
     fseek( inputFile, 0, SEEK_END );
     int endLastSubChunk = ftell( inputFile );
     int lastSubChunkSize = endLastSubChunk - beginLastSubChunk;
 
+    // Reading the chunck
+    fseek( inputFile, ( sizeof( waveHeader ) + charRequired*sizeof(char) ), SEEK_SET );
     char* lastSubChunk = 0;
     if( lastSubChunkSize !=0 ){
 
@@ -238,6 +211,8 @@ int encode( char* inputFilename, char* outputFilename, uint32_t options ) {
 
     int number;
     nCharRead = 0;
+    char charToIntArray[(header->bitsPerSample/8)];
+
     while ( nCharRead <= header->subChunk2Size ){
 
         memmove( charToIntArray, sampleArray + nCharRead, charPerSample );
@@ -272,13 +247,14 @@ int encode( char* inputFilename, char* outputFilename, uint32_t options ) {
     compressionHeader* compHeader = ( compressionHeader* )malloc( sizeof( compressionHeader ) );
     compHeader->originalSize = arraySize;
     compHeader->options = options;
-
+    printf("saida encode: %i\n", arraySize );
     FILE* outputFile = fopen( outputFilename, "wb" );
     fwrite( compHeader, sizeof( compressionHeader ), 1, outputFile );
     fwrite( header, sizeof( waveHeader ), 1, outputFile );
     fwrite( sampleArrayInt, arraySize, 1, outputFile);
     fwrite( lastSubChunk, lastSubChunkSize, 1, outputFile );
 
+    return 1;
 }
 
 /* ************************************************************************* */
@@ -287,6 +263,7 @@ int encode( char* inputFilename, char* outputFilename, uint32_t options ) {
 int decode( char* inputFilename, char* outputFilename ) {
 
     FILE* inputFile = fopen( inputFilename, "rb" );
+
     waveHeader* header = ( waveHeader* )malloc( sizeof( waveHeader ) );
     compressionHeader* compHeader = ( compressionHeader* )malloc( sizeof( compressionHeader ) );
 
@@ -301,26 +278,26 @@ int decode( char* inputFilename, char* outputFilename ) {
     /* ------------------------------------------------------------------------- */
     /* Reading the file data */
 
-    int charPerSample = ( header->bitsPerSample/8 );        // Number of chars required to store 1 sample
-    int charRequired = charPerSample*header->subChunk2Size; // Number of chars required to store the file
+    //int charPerSample = ( header->bitsPerSample/8 );        // Number of chars required to store 1 sample
+    //int charRequired = charPerSample*header->subChunk2Size; // Number of chars required to store the file
 
-    char* sampleArray = ( char* )malloc( charRequired*sizeof( char ) );           // Allocate the array used to store the samples as char
-    int* sampleArrayInt = ( int* )malloc( compHeader->originalSize ); // Allocate the array used to store the char samples into int
+    int* decodeArray = ( int* )malloc( compHeader->originalSize*sizeof(int) );      // Allocate the array used to store the data as integers
 
-    fseek( inputFile, ( sizeof( compressionHeader ) + sizeof( waveHeader ) ), SEEK_SET );
-    fread( sampleArray, 1, compHeader->originalSize, inputFile );
+    fread( decodeArray, 1, compHeader->originalSize*sizeof(int), inputFile );
 
     /* ------------------------------------------------------------------------- */
     /* Reading data after the audio data */
 
     int beginLastSubChunk = sizeof( waveHeader ) + sizeof( compHeader ) + compHeader->originalSize;
-    fseek( inputFile, 0, SEEK_END );
-    int endLastSubChunk = ftell( inputFile );
+    //fseek( inputFile, 0, SEEK_END );
+    //int endLastSubChunk = ftell( inputFile-1 );
+    int endLastSubChunk = getFileSize(inputFilename);
     int lastSubChunkSize = endLastSubChunk - beginLastSubChunk;
 
+    char* lastSubChunk = 0;
     if( lastSubChunkSize !=0 ){
 
-        char* lastSubChunk = ( char* )malloc( lastSubChunkSize*sizeof( char ) );
+        lastSubChunk = ( char* )malloc( lastSubChunkSize*sizeof( char ) );
         fread( lastSubChunk, 1, lastSubChunkSize, inputFile);
     }
 
@@ -330,21 +307,29 @@ int decode( char* inputFilename, char* outputFilename ) {
     int arraySize = compHeader->originalSize;
     if( ( compHeader->options & 0b00000100) == 0b00000100 ){ //Delta decoding
 
-        deltaDecode( sampleArrayInt, arraySize );
+        deltaDecode( decodeArray, arraySize );
     }
     if( ( compHeader->options & 0b00000010) == 0b00000010 ){ //Run-length decoding
 
         int runLengthSize;
-        int* aux = runLengthDecode( sampleArrayInt, arraySize , &runLengthSize );
-        free( sampleArrayInt );
-        sampleArrayInt = aux;
+        int* aux = runLengthDecode( decodeArray, arraySize , &runLengthSize );
+        free( decodeArray );
+        decodeArray = aux;
         arraySize = runLengthSize;
     }
     if( ( compHeader->options & 0b00000001) == 0b00000001 ){ //Huffman decoding
 
     }
+
+    FILE* outputFile = fopen( outputFilename, "wb" );
+    fwrite( header, sizeof( waveHeader ), 1, outputFile );
+    fwrite( decodeArray, arraySize, 1, outputFile);
+    fwrite( lastSubChunk, lastSubChunkSize, 1, outputFile );
 }
 
+/* ************************************************************************* */
+/* Main */
+/* ************************************************************************* */
 int main( int argc, char* argv[] ) {
 
     int i;
@@ -390,22 +375,23 @@ int main( int argc, char* argv[] ) {
         pCh = strstr( optionsInput, "-d" );
         if ( pCh != NULL ){
             options = (options | 0b00000100);
-            printf( "Requested -d (%i) \n", options );
+            printf( "Requested delta enconding (%i) \n", options );
         }
         // Check for run-length encoding
         pCh = strstr( optionsInput, "-c" );
         if ( pCh != NULL ){
             options = (options | 0b00000010);
-            printf( "Requested -c (%i) \n", options );
+            printf( "Requested run-length encoding (%i) \n", options );
         }
         // Check for Huffman coding
         pCh = strstr( optionsInput, "-h" );
         if ( pCh != NULL ){
             options = (options | 0b00000001);
-            printf( "Requested -h (%i) \n", options );
+            printf( "Requested huffman encoding (%i) \n", options );
         }
 
         encode( inputFilename, outputFilename, options );
+        printf( "File encoded to %s\n", outputFilename );
     }
 
     /* ------------------------------------------------------------------------- */
