@@ -19,7 +19,7 @@
 /* ************************************************************************* */
 int main( int argc, char* argv[] ) {
 
-    int i;
+    int i, response, validOp = 0;
     uint32_t options = 0b00000000;
     char operationInput[50];
     char optionsInput[50];
@@ -27,12 +27,14 @@ int main( int argc, char* argv[] ) {
     char outputFilename[50];
     char* pCh;
 
+    strcpy(optionsInput,"");
+
     /* ------------------------------------------------------------------------- */
     /* Processing input */
 
     if( argc < 3 ){
 
-        printf( "[Error] \tInsuficient number of inputs (%i).\n", argc );
+        printf( "[Error] \tInsuficient number of inputs.\n" );
 
         return 0;
 
@@ -42,10 +44,11 @@ int main( int argc, char* argv[] ) {
     strcpy(inputFilename, argv[argc-2]);
     strcpy(outputFilename, argv[argc-1]);
 
-    printf( "Operation: %s %s %s\n", operationInput, inputFilename, outputFilename );
+    printf( "[Operation]\t%s %s %s\n", operationInput, inputFilename, outputFilename );
 
     /* ------------------------------------------------------------------------- */
     /* Processing a coding operation */
+
 
     if ( strcmp(operationInput,"encode") == 0 ){
 
@@ -62,7 +65,7 @@ int main( int argc, char* argv[] ) {
 
         for( i = 2; i <= (argc-3); i++ ){   /* If we have more than 4 argc inputs it's ok to do it */
 
-            strcat( optionsInput, argv[i] );
+            strcat( optionsInput, argv[i] );    /* Concatenate all flags to better identify them */
 
         }
 
@@ -71,7 +74,7 @@ int main( int argc, char* argv[] ) {
         if ( pCh != NULL ){
 
             options = (options | 0b00000100);
-            printf( "Requested delta enconding \n" );
+            printf( "[Requested] \tDelta enconding \n" );
 
         }
 
@@ -80,7 +83,7 @@ int main( int argc, char* argv[] ) {
         if ( pCh != NULL ){
 
             options = (options | 0b00000010);
-            printf( "Requested run-length encoding \n" );
+            printf( "[Requested] \tRun-length encoding \n" );
 
         }
 
@@ -89,15 +92,19 @@ int main( int argc, char* argv[] ) {
         if ( pCh != NULL ){
 
             options = (options | 0b00000001);
-            printf( "Requested huffman encoding \n" );
+            printf( "[Requested] \tHuffman encoding \n" );
 
         }
 
-        encode( inputFilename, outputFilename, options );
+        response = encode( inputFilename, outputFilename, options );
 
-        printf( "File encoded to: %s\n", outputFilename );
+        if( response == 1 ){
+            printf( "[Success]\tFile encoded to: %s\n", outputFilename );
+        }
 
         free(pCh);
+    }else{
+        validOp = validOp + 1;          /* 'validOp = 1' means that the encode functionality was not requested */
     }
 
     /* ------------------------------------------------------------------------- */
@@ -105,11 +112,29 @@ int main( int argc, char* argv[] ) {
 
     if( strcmp( operationInput, "decode" ) == 0 ){
 
-        decode( inputFilename, outputFilename );
+        if ( argc <= 3 ){
 
-        printf( "File decoded to: %s\n", outputFilename );
+            printf( "[Error] \tInsuficient number of inputs (%i). \nTry again using: decode <input.wav> <output.bin>\n", argc );
+
+            return 0;
+
+        }
+
+        response = decode( inputFilename, outputFilename );
+
+        if( response == 1 ){
+            printf( "[Success]\tFile decoded to: %s\n", outputFilename );
+        }
+    }else{
+        validOp = validOp + 2;          /* 'validOp = 2' means that the decode functionality was not requested */
+    }
+
+    if( validOp == 3 ){                 /* 'validOp = 3' means that either the encode and decode functionalities were not requested */
+
+        printf( "[Error] \tOperation requested wasn't valid. (encode/decode) \nTry to use the syntax described on the README file.\n" );
 
     }
 
     return 0;
+    
 }

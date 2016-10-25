@@ -3,7 +3,7 @@
 
 #include "fileResources.h"
 
-int* deltaEncode( int* , waveHeader* );
+int* deltaEncode( int* , int );
 
 int* deltaDecode( int* , int );
 

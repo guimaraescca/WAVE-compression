@@ -9,14 +9,14 @@
 #include "fileResources.h"
 
 /* Delta encoding function */
-int* deltaEncode( int* sampleArrayInt, waveHeader* header ){
+int* deltaEncode( int* sampleArrayInt, int arraySize ){
 
-    int* deltaArray = ( int* )malloc( header->subChunk2Size*sizeof( int ) ); // Differrences array
+    int* deltaArray = ( int* )malloc( arraySize*sizeof( int ) ); /* Store the differrences array */
     int i;
 
     deltaArray[0] = sampleArrayInt[0];
 
-    for( i=1; i<header->subChunk2Size; i++ ){
+    for( i=1; i<arraySize; i++ ){
 
         deltaArray[i] = sampleArrayInt[i] - sampleArrayInt[i-1];
     }

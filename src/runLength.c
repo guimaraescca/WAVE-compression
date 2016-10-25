@@ -57,7 +57,7 @@ int* runLengthDecode( int* sampleArrayInt, int arraySize , int* runLengthSize ){
         totalCount = totalCount + sampleArrayInt[i];
 
     }
-    
+
     int newArraySize = ceil( (double)totalCount /32.0) ;
     int* newSampleArray = ( int* )calloc(newArraySize, sizeof(int) );
     int bitCount = 0;

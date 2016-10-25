@@ -32,13 +32,10 @@ int decode( char* inputFilename, char* outputFilename ) {
     fread( compHeader, 1, sizeof( compressionHeader ), inputFile );
     fread( header, 1, sizeof( waveHeader ), inputFile );
 
-    printCompHeader(compHeader);
-    printWaveHeader(header);
-
     /* ------------------------------------------------------------------------- */
     /* Reading the file data */
 
-    int* decodeArray = ( int* )malloc( compHeader->originalSize*sizeof(int) );      // Allocate the array used to store the data as integers
+    int* decodeArray = ( int* )malloc( compHeader->originalSize*sizeof(int) );      /* Allocate the array used to store the data as integers */
     fread( decodeArray, 1, compHeader->originalSize*sizeof(int), inputFile );
 
     /* ------------------------------------------------------------------------- */
@@ -54,15 +51,15 @@ int decode( char* inputFilename, char* outputFilename ) {
 
     int arraySize = compHeader->originalSize;
 
-    if( ( compHeader->options & 0b00000100) == 0b00000100 ){ /* Delta decoding */
+    /* Delta decoding */
+    if( ( compHeader->options & 0b00000100) == 0b00000100 ){
 
         deltaDecode( decodeArray, arraySize );
 
     }
 
-    printf("array[i:213102]: %i array[i:213103]: %i\n", decodeArray[213102], decodeArray[213103] );
-
-    if( ( compHeader->options & 0b00000010) == 0b00000010 ){ /* Run-length decoding */
+    /* Run-length decoding */
+    if( ( compHeader->options & 0b00000010) == 0b00000010 ){
 
         int runLengthSize;
         int* aux = runLengthDecode( decodeArray, arraySize , &runLengthSize );
@@ -72,7 +69,8 @@ int decode( char* inputFilename, char* outputFilename ) {
 
     }
 
-    if( ( compHeader->options & 0b00000001) == 0b00000001 ){ /* Huffman decoding */
+    /* Huffman decoding */
+    if( ( compHeader->options & 0b00000001) == 0b00000001 ){
 
     }
     /* ------------------------------------------------------------------------- */
@@ -80,8 +78,6 @@ int decode( char* inputFilename, char* outputFilename ) {
 
     int i, j, number, count = 0;
     char decodeArrayChar[ arraySize*(header->bitsPerSample/8) ];
-
-    printf("\ndecodeArrayChar size: %i\n",  arraySize*(header->bitsPerSample/8));
 
     for( i = 0;  i < arraySize; i++ ){
 
@@ -95,8 +91,6 @@ int decode( char* inputFilename, char* outputFilename ) {
 
         }
     }
-
-    printf("\ndecodeArrayChar size: %i\n",  arraySize*(header->bitsPerSample/8));
 
     FILE* outputFile = fopen( outputFilename, "w" );
 
