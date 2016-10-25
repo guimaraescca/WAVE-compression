@@ -27,4 +27,4 @@ fileResources.o:
 	$(CC) -lm -c ./src/fileResources.c
 
 clean:
-	rm -f ./bin/*.o ./bin/main
+	rm -f ./bin/*.o ./bin/main ./*.o

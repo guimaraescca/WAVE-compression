@@ -17,67 +17,92 @@
 /* ************************************************************************* */
 int decode( char* inputFilename, char* outputFilename ) {
 
-    FILE* inputFile = fopen( inputFilename, "rb" );
+    FILE* inputFile = fopen( inputFilename, "r" );
 
     waveHeader* header = ( waveHeader* )malloc( sizeof( waveHeader ) );
     compressionHeader* compHeader = ( compressionHeader* )malloc( sizeof( compressionHeader ) );
 
     if( inputFile == NULL ) {
+
         printf( "[Error] \tUnable to read input file. <decode>\n" );
         return 0;
+
     }
 
     fread( compHeader, 1, sizeof( compressionHeader ), inputFile );
     fread( header, 1, sizeof( waveHeader ), inputFile );
 
+    printCompHeader(compHeader);
+    printWaveHeader(header);
+
     /* ------------------------------------------------------------------------- */
     /* Reading the file data */
 
-    //int charPerSample = ( header->bitsPerSample/8 );        // Number of chars required to store 1 sample
-    //int charRequired = charPerSample*header->subChunk2Size; // Number of chars required to store the file
-
     int* decodeArray = ( int* )malloc( compHeader->originalSize*sizeof(int) );      // Allocate the array used to store the data as integers
-
     fread( decodeArray, 1, compHeader->originalSize*sizeof(int), inputFile );
 
     /* ------------------------------------------------------------------------- */
-    /* Reading data after the audio data */
+    /* Reading the subchuncks after the audio data */
 
-    int beginLastSubChunk = sizeof( waveHeader ) + sizeof( compHeader ) + compHeader->originalSize;
-    //fseek( inputFile, 0, SEEK_END );
-    //int endLastSubChunk = ftell( inputFile-1 );
-    int endLastSubChunk = getFileSize(inputFilename);
-    int lastSubChunkSize = endLastSubChunk - beginLastSubChunk;
+    int lastSubChunkSize = ( getFileSize( inputFile ) - ( sizeof( compressionHeader ) + sizeof( waveHeader ) + compHeader->originalSize*sizeof( int ) ) );
+    char* lastSubChunk = ( char* )malloc( lastSubChunkSize*sizeof( char ) );
 
-    char* lastSubChunk = 0;
-    if( lastSubChunkSize !=0 ){
-
-        lastSubChunk = ( char* )malloc( lastSubChunkSize*sizeof( char ) );
-        fread( lastSubChunk, 1, lastSubChunkSize, inputFile);
-    }
+    fread( lastSubChunk, 1, lastSubChunkSize, inputFile);
 
     /* ------------------------------------------------------------------------- */
     /* Execute the decoding algorithms in the compression header */
 
     int arraySize = compHeader->originalSize;
-    if( ( compHeader->options & 0b00000100) == 0b00000100 ){ //Delta decoding
+
+    if( ( compHeader->options & 0b00000100) == 0b00000100 ){ /* Delta decoding */
 
         deltaDecode( decodeArray, arraySize );
+
     }
-    if( ( compHeader->options & 0b00000010) == 0b00000010 ){ //Run-length decoding
+
+    printf("arraySize:%i\n array[i:213102]: %i array[i:213103]: %i\n", arraySize, decodeArray[213102], decodeArray[213103] );
+
+    if( ( compHeader->options & 0b00000010) == 0b00000010 ){ /* Run-length decoding */
 
         int runLengthSize;
         int* aux = runLengthDecode( decodeArray, arraySize , &runLengthSize );
         free( decodeArray );
         decodeArray = aux;
         arraySize = runLengthSize;
-    }
-    if( ( compHeader->options & 0b00000001) == 0b00000001 ){ //Huffman decoding
 
     }
 
-    FILE* outputFile = fopen( outputFilename, "wb" );
+    if( ( compHeader->options & 0b00000001) == 0b00000001 ){ /* Huffman decoding */
+
+    }
+    /* ------------------------------------------------------------------------- */
+    /* Transform every int into 'bitsPerSample/8' char */
+
+    int i, j, number, count = 0;
+    char decodeArrayChar[ compHeader->originalSize*(header->bitsPerSample/8) ];
+
+    printf("\tdecodeArrayChar size: %i\n",  compHeader->originalSize*(header->bitsPerSample/8));
+
+    for( i = 0;  i < compHeader->originalSize; i = i++ ){
+
+        number = 0;
+
+        for( j = 0; j < ( header->bitsPerSample/8 ); j++ ){
+
+            number = ( decodeArray[i] >> ( ( header->bitsPerSample/8 ) - j - 1 ) * 8 ) & (0x000000ff);
+            decodeArrayChar[count] = (char)number;
+            count++;
+
+        }
+    }
+    printf("\tdecodeArrayChar size: %i\n",  compHeader->originalSize*(header->bitsPerSample/8));
+
+    printf("GOKU!\n" );
+    FILE* outputFile = fopen( outputFilename, "w" );
+
     fwrite( header, sizeof( waveHeader ), 1, outputFile );
-    fwrite( decodeArray, arraySize, 1, outputFile);
+    fwrite( decodeArrayChar, compHeader->originalSize*(header->bitsPerSample/8), 1, outputFile);
     fwrite( lastSubChunk, lastSubChunkSize, 1, outputFile );
+
+    return 1;
 }

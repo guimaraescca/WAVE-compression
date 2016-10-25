@@ -7,7 +7,6 @@
 #include <errno.h>
 #include <sys/stat.h>
 
-
 #include "encode.h"
 #include "decode.h"
 #include "delta.h"
@@ -32,8 +31,11 @@ int main( int argc, char* argv[] ) {
     /* Processing input */
 
     if( argc < 3 ){
-        printf( "[Error] \tInsuficient number of inputs(%i).\n", argc );
+
+        printf( "[Error] \tInsuficient number of inputs (%i).\n", argc );
+
         return 0;
+
     }
 
     strcpy(operationInput, argv[1]);
@@ -48,45 +50,65 @@ int main( int argc, char* argv[] ) {
     if ( strcmp(operationInput,"encode") == 0 ){
 
         if ( argc <= 4 ){
+
             printf( "[Error] \tInsuficient number of inputs (%i). \nTry again using: encode (-d | -c | -h) <input.wav> <output.bin>\n", argc );
+
             return 0;
+
         }
 
         /* ------------------------------------------------------------------------- */
         /* Concatenate all inputs in argv, to identify the options */
 
-        for( i = 2; i <= (argc-3); i++ ){   // If we have more than 4 argc inputs it's ok to do it
+        for( i = 2; i <= (argc-3); i++ ){   /* If we have more than 4 argc inputs it's ok to do it */
+
             strcat( optionsInput, argv[i] );
+
         }
 
-        // Check for differences encoding
+        /* Check for delta encoding request */
         pCh = strstr( optionsInput, "-d" );
         if ( pCh != NULL ){
+
             options = (options | 0b00000100);
-            printf( "Requested delta enconding (%i) \n", options );
+            printf( "Requested delta enconding \n" );
+
         }
-        // Check for run-length encoding
+
+        /* Check for run-length encoding request */
         pCh = strstr( optionsInput, "-c" );
         if ( pCh != NULL ){
+
             options = (options | 0b00000010);
-            printf( "Requested run-length encoding (%i) \n", options );
+            printf( "Requested run-length encoding \n" );
+
         }
-        // Check for Huffman coding
+
+        /* Check for Huffman coding request */
         pCh = strstr( optionsInput, "-h" );
         if ( pCh != NULL ){
+
             options = (options | 0b00000001);
-            printf( "Requested huffman encoding (%i) \n", options );
+            printf( "Requested huffman encoding \n" );
+
         }
 
         encode( inputFilename, outputFilename, options );
-        printf( "File encoded to %s\n", outputFilename );
+
+        printf( "File encoded to: %s\n", outputFilename );
+
+        free(pCh);
     }
 
     /* ------------------------------------------------------------------------- */
     /* Processing a decoding operation */
 
     if( strcmp( operationInput, "decode" ) == 0 ){
+
         decode( inputFilename, outputFilename );
+
+        printf( "File decoded to: %s\n", outputFilename );
+
     }
 
     return 0;

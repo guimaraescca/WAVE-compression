@@ -9,15 +9,14 @@
 
 #include "fileResources.h"
 
-/* Get file size */
-off_t getFileSize(char *filename) {
+int getFileSize(FILE *inFile){
+    int fileSize = 0;
+    fseek(inFile, 0, SEEK_END);
 
-    struct stat st;
+    fileSize = ftell(inFile);
 
-    if ( stat( filename, &st ) == 0 ){
-        return st.st_size;
-    }
-    return -1;
+    fseek(inFile, 0, SEEK_SET);
+    return fileSize;
 }
 
 /*  sampleArray - Char array containing representing 1 sample
@@ -37,4 +36,21 @@ int recursiveCharToIntSample( char* sampleArray, int size, int intSample ){
     }
 
     recursiveCharToIntSample( sampleArray+1, size-8, intSample );
+}
+
+int printCompHeader( compressionHeader* compHeader ){
+
+    printf( "[Compression header] Original size: %i\n", compHeader->originalSize );
+    printf( "[Compression header] Options: %i\n", compHeader->options );
+
+    return 1;
+
+}
+
+int printWaveHeader( waveHeader* header ){
+
+    printf("[Wave header] bitsPerSample: %i\n", header->bitsPerSample );
+    printf("[Wave header] subChunk2Size: %i\n", header->subChunk2Size );
+
+    return 1;
 }

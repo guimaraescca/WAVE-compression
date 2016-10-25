@@ -26,8 +26,12 @@ typedef struct compressionHeader {
     int options;            // Compressions methods used, stored as bits
 }compressionHeader;
 
-off_t getFileSize( char* );
+int getFileSize( FILE* );
 
 int recursiveCharToIntSample( char*, int, int  );
+
+int printCompHeader( compressionHeader* );
+
+int printWaveHeader( waveHeader* );
 
 #endif
