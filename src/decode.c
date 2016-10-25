@@ -60,7 +60,7 @@ int decode( char* inputFilename, char* outputFilename ) {
 
     }
 
-    printf("arraySize:%i\n array[i:213102]: %i array[i:213103]: %i\n", arraySize, decodeArray[213102], decodeArray[213103] );
+    printf("array[i:213102]: %i array[i:213103]: %i\n", decodeArray[213102], decodeArray[213103] );
 
     if( ( compHeader->options & 0b00000010) == 0b00000010 ){ /* Run-length decoding */
 
@@ -79,25 +79,25 @@ int decode( char* inputFilename, char* outputFilename ) {
     /* Transform every int into 'bitsPerSample/8' char */
 
     int i, j, number, count = 0;
-    char decodeArrayChar[ compHeader->originalSize*(header->bitsPerSample/8) ];
+    char decodeArrayChar[ arraySize*(header->bitsPerSample/8) ];
 
-    printf("\tdecodeArrayChar size: %i\n",  compHeader->originalSize*(header->bitsPerSample/8));
+    printf("\ndecodeArrayChar size: %i\n",  arraySize*(header->bitsPerSample/8));
 
-    for( i = 0;  i < compHeader->originalSize; i = i++ ){
+    for( i = 0;  i < arraySize; i++ ){
 
         number = 0;
 
         for( j = 0; j < ( header->bitsPerSample/8 ); j++ ){
 
-            number = ( decodeArray[i] >> ( ( header->bitsPerSample/8 ) - j - 1 ) * 8 ) & (0x000000ff);
+            number = decodeArray[i] >> ( ( ( header->bitsPerSample/8 ) - j - 1 ) * 8 );
             decodeArrayChar[count] = (char)number;
             count++;
 
         }
     }
-    printf("\tdecodeArrayChar size: %i\n",  compHeader->originalSize*(header->bitsPerSample/8));
 
-    printf("GOKU!\n" );
+    printf("\ndecodeArrayChar size: %i\n",  arraySize*(header->bitsPerSample/8));
+
     FILE* outputFile = fopen( outputFilename, "w" );
 
     fwrite( header, sizeof( waveHeader ), 1, outputFile );
