@@ -1,4 +1,4 @@
-CC=gcc
+CC=gcc -g
 CFLAGS=-I
 #DEPS=encode.h decode.h delta.h runLength.h huffman.h fileResources.h
 

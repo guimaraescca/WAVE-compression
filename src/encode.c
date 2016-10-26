@@ -116,5 +116,41 @@ int encode( char* inputFilename, char* outputFilename, uint32_t options ) {
     fclose(outputFile);
     fclose(inputFile);
 
+// ------------TESTES QUICKSORT-----------------------------
+
+    quicksort( sampleArrayInt, 0, arraySize-1 );    /* Ordenates the samples array */
+
+    int huffmanListSize;                            /* Stores the size computed by the 'getFrequency' function */
+    huffman_node** list = getFrequency( sampleArrayInt, arraySize , &huffmanListSize );     /* Obtains the frequency associated to each sample */
+    //huffman_printNodes( list , huffmanListSize );
+
+    printf("size: %i element: %i\n", huffmanListSize, list[huffmanListSize-1]->frequency );
+
+    huffman_quicksort( list, 0, huffmanListSize-1 );
+
+    //huffman_printNodes( list , huffmanListSize );
+
+    
+/*
+    int counter=1;
+    int lastnumber = sampleArrayInt[0];
+
+    for( i=1; i<arraySize; i++ ){
+
+        if( sampleArrayInt[i] != lastnumber ){
+
+            printf("%i c:%i\n", lastnumber, counter);
+            lastnumber = sampleArrayInt[i];
+            counter =1;
+
+        }else{
+            counter++;
+        }
+    }
+    printf("%i c:%i\n", lastnumber, counter);
+*/
+
+// ------------/TESTES QUICKSORT-----------------------------
+
     return 1;
 }

@@ -99,11 +99,15 @@ int main( int argc, char* argv[] ) {
         response = encode( inputFilename, outputFilename, options );
 
         if( response == 1 ){
+
             printf( "[Success]\tFile encoded to: %s\n", outputFilename );
+
         }
 
         free(pCh);
+
     }else{
+
         validOp = validOp + 1;          /* 'validOp = 1' means that the encode functionality was not requested */
     }
 
@@ -115,26 +119,26 @@ int main( int argc, char* argv[] ) {
         if ( argc <= 3 ){
 
             printf( "[Error] \tInsuficient number of inputs (%i). \nTry again using: decode <input.wav> <output.bin>\n", argc );
-
             return 0;
-
         }
 
         response = decode( inputFilename, outputFilename );
 
         if( response == 1 ){
+
             printf( "[Success]\tFile decoded to: %s\n", outputFilename );
         }
+
     }else{
+
         validOp = validOp + 2;          /* 'validOp = 2' means that the decode functionality was not requested */
     }
 
     if( validOp == 3 ){                 /* 'validOp = 3' means that either the encode and decode functionalities were not requested */
 
         printf( "[Error] \tOperation requested wasn't valid. (encode/decode) \nTry to use the syntax described on the README file.\n" );
-
     }
 
     return 0;
-    
+
 }

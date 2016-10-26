@@ -24,7 +24,7 @@ int decode( char* inputFilename, char* outputFilename ) {
 
     if( inputFile == NULL ) {
 
-        printf( "[Error] \tUnable to read input file. <decode>\n" );
+        printf( "[Error] \tUnable to read input file. <decode>\nYou must have encoded file to execute this operation.\n" );
         return 0;
 
     }
