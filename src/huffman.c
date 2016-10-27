@@ -60,7 +60,6 @@ int huffman_swapNodes( huffman_node* node1, huffman_node* node2 ){
 
 }
 
-
 /* Used by the Quicksort-Huffman ordenation of nodes */
 int huffman_quicksortDivide( huffman_node** list, int st, int end){
     int c = ( list[end]->frequency );
@@ -98,6 +97,7 @@ huffman_node* huffman_createNode( int number, int frequency ){
     newNode->frequency = frequency;
     newNode->left = NULL;
     newNode->right = NULL;
+    newNode->isLeaf = 0;
 
     return newNode;
 
@@ -115,10 +115,10 @@ int huffman_printNodes( huffman_node** list , int listSize){
         return 0;
     }
 
-    for( i=0; i<listSize-1; i++ ){
+    for( i=0; i<listSize; i++ ){
 
         node = list[i];
-        printf( "N: %i f: %i\n", node->number, node->frequency );
+        printf( "N#: %i freq: %i\n", node->number, node->frequency );
     }
 
     return 1;
@@ -143,22 +143,54 @@ huffman_node** getFrequency( int* array, int arraySize , int* huffmanListSize ){
 
             orderedList = ( huffman_node** )realloc( orderedList, count*sizeof( huffman_node* ) );   /* Reallocates memory to store the new array of huffman_node's */
 
-            newNode = huffman_createNode( array[i], 1 ); /* Store both the number and reset the frequency */
+            newNode = huffman_createNode( array[i], 1 );    /* Store both the number and reset the frequency */
+            newNode->isLeaf = 1;
 
-            orderedList[count-1] = newNode;             /* Insert's the node in the ordered array */
+            orderedList[count-1] = newNode;                 /* Insert's the node in the ordered array */
 
-
-            count++;                                    /* Next number read is different from the previous one */
+            count++;                                        /* Next number read is different from the previous one */
         }
     }
 
     *huffmanListSize = (count-1);
 
-    //newNode = NULL;                                     /* Desalocating memory */
-    //free(newNode);
+    //newNode = NULL;
+    //free(newNode);                                        /* Desalocating memory */
 
     return orderedList;
 }
+
+/* Receive a list of nodes and generate the huffman tree according to the frequencies */
+huffman_node* generateTree( huffman_node** list , int listSize ){
+
+    huffman_node* newNode = huffman_createNode(0,0);
+
+    int i = 0;
+    while( listSize > 1 ){
+
+        newNode =  huffman_createNode( 0, 0 );
+
+        newNode->frequency = ( list[0]->frequency + list[1]->frequency );
+        newNode->left = list[0];
+        newNode->right = list[1];
+
+        /* Delete first position from list */
+        memmove( list, list + 1 , ( listSize-1 )*sizeof( list[0] )  );
+        listSize--;
+
+        /* Replace new node in the previous second position*/
+        list[0] = newNode;
+
+        newNode = NULL;
+        free(newNode);
+
+        /* Ordenate the new array */
+        huffman_quicksort( list, 0, listSize-2 );
+
+    }
+    return newNode;
+}
+
 
 int huffmanEncode( int* sampleArrayInt, int arraySize ){
     return 0;

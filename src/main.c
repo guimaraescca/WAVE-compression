@@ -74,7 +74,7 @@ int main( int argc, char* argv[] ) {
         if ( pCh != NULL ){
 
             options = (options | 0b00000100);
-            printf( "[Requested] \tDelta enconding \n" );
+            printf( "[Requested] \tDelta encoding \n" );
 
         }
 

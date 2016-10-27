@@ -6,6 +6,7 @@ typedef struct huffman_node{
     int frequency;
     struct huffman_node *left;
     struct huffman_node *right;
+    int isLeaf;
 }huffman_node;
 
 typedef struct huffman_tree{
@@ -24,6 +25,8 @@ int huffman_quicksort( huffman_node** , int , int );
 huffman_node* huffman_createNode( int, int );
 
 int huffman_printNodes( huffman_node**, int );
+
+huffman_node* generateTree( huffman_node** , int );
 
 huffman_node** getFrequency( int*, int, int* );
 
